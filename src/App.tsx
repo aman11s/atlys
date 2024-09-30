@@ -63,9 +63,6 @@ function App() {
         );
         if (!currentFunction) break;
 
-        const test = validateEquation(currentFunction.equation);
-        console.log({ test });
-
         if (!validateEquation(currentFunction.equation)) {
           console.error(`Invalid equation: ${currentFunction.equation}`);
           setResult(null);
