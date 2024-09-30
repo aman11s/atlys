@@ -2,21 +2,85 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { FunctionCard, InputField, OutputField } from "./components";
 
+interface Function {
+  id: number;
+  equation: string;
+  nextFunction: string;
+}
+
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const [functions, setFunctions] = useState([
+  const [functions, setFunctions] = useState<Function[]>([
     { id: 1, equation: "x^2", nextFunction: "2" },
-    { id: 2, equation: "2x+4", nextFunction: "4" },
+    { id: 2, equation: "2*x+4", nextFunction: "4" },
     { id: 3, equation: "x^2+20", nextFunction: "" },
     { id: 4, equation: "x-2", nextFunction: "5" },
     { id: 5, equation: "x/2", nextFunction: "3" },
   ]);
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    const { clientX, clientY } = event;
-    console.log(`X: ${clientX}, Y: ${clientY}`);
+  const [inputValue, setInputValue] = useState<number>(0);
+  const [result, setResult] = useState<number | null>(null);
+
+  const handleInputChange = (value: number) => {
+    setInputValue(value);
   };
+
+  const validateEquation = (equation: string): boolean => {
+    const validOperators = /^[x0-9+\-*/^()\s]+$/;
+    if (!validOperators.test(equation)) {
+      return false;
+    }
+
+    // Check for implicit multiplication (e.g., 2x should be invalid)
+    const implicitMultiplication = /\d+x/;
+    if (implicitMultiplication.test(equation)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const calculateResult = (x: number, equation: string): number => {
+    const sanitizedEquation = equation.replace(/\^/g, "**");
+    try {
+      return new Function("x", `return ${sanitizedEquation}`)(x);
+    } catch (error) {
+      console.error("Error in calculation:", error);
+      return NaN;
+    }
+  };
+
+  useEffect(() => {
+    // execute chain IIFE
+    (() => {
+      let currentValue = inputValue;
+      let currentFunctionId = "1";
+
+      for (let i = 0; i < 5; i++) {
+        const currentFunction = functions.find(
+          (f) => f.id.toString() === currentFunctionId
+        );
+        if (!currentFunction) break;
+
+        const test = validateEquation(currentFunction.equation);
+        console.log({ test });
+
+        if (!validateEquation(currentFunction.equation)) {
+          console.error(`Invalid equation: ${currentFunction.equation}`);
+          setResult(null);
+          return;
+        }
+
+        currentValue = calculateResult(currentValue, currentFunction.equation);
+        currentFunctionId = currentFunction.nextFunction;
+
+        if (!currentFunctionId) break;
+      }
+
+      setResult(currentValue);
+    })();
+  }, [inputValue, functions]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -79,9 +143,15 @@ function App() {
   }, []);
 
   const handleEquationChange = (id: number, newEquation: string) => {
-    setFunctions(
-      functions.map((f) => (f.id === id ? { ...f, equation: newEquation } : f))
-    );
+    if (validateEquation(newEquation)) {
+      setFunctions(
+        functions.map((f) =>
+          f.id === id ? { ...f, equation: newEquation } : f
+        )
+      );
+    } else {
+      console.error("Invalid equation entered");
+    }
   };
 
   const handleNextFunctionChange = (id: number, newNextFunction: string) => {
@@ -93,19 +163,15 @@ function App() {
   };
 
   return (
-    <main
-      className="w-full h-screen overflow-hidden bg-dot-grid bg-16"
-      onMouseMove={handleMouseMove}
-    >
-      <canvas
-        ref={canvasRef}
-        // className="absolute pointer-events-none bg-black"
-        className="absolute pointer-events-none "
-      />
+    <main className="w-full h-screen overflow-hidden bg-dot-grid bg-16">
+      <canvas ref={canvasRef} className="absolute pointer-events-none" />
 
       <div className="relative z-10">
         <div className="flex mt-20 mx-40">
-          <InputField />
+          <InputField
+            inputValue={inputValue}
+            onInputChange={handleInputChange}
+          />
 
           <div className="flex flex-wrap gap-32 justify-center">
             {functions.map((func) => (
@@ -121,7 +187,7 @@ function App() {
             ))}
           </div>
 
-          <OutputField />
+          <OutputField result={result} />
         </div>
       </div>
     </main>
